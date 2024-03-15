@@ -55,27 +55,32 @@ const registerUser = asyncHandler(async (req, res) => {
     return res.status(200).ApiResponse(200, createdUser, "User Created Successfully");
 })
 
-const login = asyncHandler(async (req, res) => {
+const loginUser = asyncHandler(async (req, res) => {
+    // Inputs from user frontend
     const {email, password} = req.body;
 
+    // Validating User Email
     if(!email){
         throw new ApiError(400, "Email is required");
     }
 
+    // Validating User Already Exist or Not
     const user = await User.findOne({email});
 
     if(!user){
         throw new ApiError(404, "User Not Found");
     }
-
+    // Check Password is Correct or Not
     const isPasswordCorrect = user.isPasswordCorrect(password);
 
     if(!isPasswordCorrect){
         throw new ApiError(401, "Password Incorrect");
     }
 
+    // Generating Access and Refresh Token
     const {accessToken, refreshToken} = user.generateAccessAndRefreshToken();
 
+    // Getting Logged In User Data
     const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
 
     const option = {
@@ -89,3 +94,27 @@ const login = asyncHandler(async (req, res) => {
         .cookie("accessToken", accessToken, options)
         .ApiResponse(200, loggedInUser, "User Logged In Successfully");
 });
+
+const uploadAvatar = asyncHandler(async (req, res) => {
+    let avatarLocalFilePath;
+    if(req.files && Array.isArray(req.files.avatar) && req.files.avatar.length > 0){
+        avatarLocalFilePath = req.files.avatar[0].path;
+    }
+
+    const avatar = await uploadOnCloudinary(avatarLocalFilePath);
+
+    if(!avatar){
+        throw new ApiError(500, "Something Went Wrong While Uploading Avatar");
+    }
+
+    const user = await User.findById(req.user._id);
+    user.avatar = avatar.url;
+
+    return res.status(200).ApiResponse(200, user, "Avatar Uploaded Successfully");
+});
+
+
+export {
+    registerUser,
+    loginUser,
+}
